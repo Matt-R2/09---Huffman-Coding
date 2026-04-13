@@ -11,6 +11,10 @@ public class PriorityQueue<E extends Comparable<E>> {
         return con.isEmpty();
     }
 
+    public int size() {
+        return con.size();
+    }
+
     public E front() {
         return con.get(0);
     }

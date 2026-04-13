@@ -21,10 +21,16 @@
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SimpleHuffProcessor implements IHuffProcessor {
 
     private IHuffViewer myViewer;
+    private Map<Integer, String> codes;
+    private TreeNode myRoot;
+    private int myOriginalSize;
+    private int myCompressedSize;
 
     /**
      * Preprocess data so that compression is possible ---
@@ -43,11 +49,112 @@ public class SimpleHuffProcessor implements IHuffProcessor {
      * reproduce the tree, AND the actual data.
      * @throws IOException if an error occurs while reading from the input file.
      */
-    public int preprocessCompress(InputStream in, int headerFormat) throws IOException {
+    public int preprocessCompress(InputStream in, int headerFormat)
+            throws IOException {
         showString("Not working yet");
         myViewer.update("Still not working");
-        throw new IOException("preprocess not implemented");
-        //return 0;
+        //throw new IOException("preprocess not implemented");
+
+
+        //Build Frequency Table
+        BitInputStream bitIn = new BitInputStream(in);
+        Map<Integer, Integer> freq = new HashMap<>();
+        int totalBitsRead = 0;
+        int val = 0;
+        while((val = bitIn.read()) != -1)
+        {
+            if(!freq.containsKey(val))
+            {
+                freq.put(val, 1);
+            }
+            else
+            {
+                freq.put(val, freq.get(val) + 1);
+            }
+            totalBitsRead+=8;
+        }
+        myOriginalSize = totalBitsRead;
+        //Add Pseudo-EOF
+        freq.put(IHuffConstants.PSEUDO_EOF, 1);
+
+        //Build Tree
+        HuffmanTree tree = new HuffmanTree(freq);
+        myRoot = tree.getRoot();
+
+        //Get Codes
+        codes = new HashMap<>();
+        generateCodes(myRoot, "", codes);
+
+        //Calculate compressed size
+        myCompressedSize = calculateCompressedSize(freq, headerFormat, codes);
+
+        return myOriginalSize - myCompressedSize;
+
+    }
+
+    private void generateCodes(TreeNode node, String path, Map<Integer, String> map)
+    {
+        if(node != null)
+        {
+            if(node.getValue() != -1)
+            {
+                codes.put(node.getValue(), path);
+            }
+            else
+            {
+                generateCodes(node.getLeft(), path + "0", map);
+                generateCodes(node.getRight(), path + "1", map);
+            }
+        }
+    }
+
+    private int calculateCompressedSize
+            (Map<Integer, Integer> freq, int header, Map<Integer, String> codes)
+    {
+        int totalBits = IHuffConstants.BITS_PER_INT + IHuffConstants.BITS_PER_INT;
+
+        if(header == IHuffConstants.STORE_COUNTS)
+        {
+            totalBits += IHuffConstants.ALPH_SIZE * IHuffConstants.BITS_PER_INT;
+        }
+        else if(header == IHuffConstants.STORE_TREE)
+        {
+            totalBits += IHuffConstants.BITS_PER_INT + countTreeHeaderBits(myRoot);
+        }
+
+        for(int charVal : freq.keySet())
+        {
+            String code = codes.get(charVal);
+            int frequency = freq.get(charVal);
+            totalBits += (frequency * code.length());
+        }
+
+        return totalBits;
+    }
+
+    private int countTreeHeaderBits(TreeNode node)
+    {
+        int[] count = {0};
+        countBitsHelper(node, count);
+        return count[0];
+    }
+
+    private void countBitsHelper(TreeNode node, int[] count)
+    {
+        if(node != null)
+        {
+            count[0] += 1;
+
+            if(node.getLeft() == null && node.getRight() == null)
+            {
+                count[0] += (IHuffConstants.BITS_PER_WORD + 1);
+            }
+            else
+            {
+                countBitsHelper(node.getLeft(), count);
+                countBitsHelper(node.getRight(), count);
+            }
+        }
     }
 
     /**
