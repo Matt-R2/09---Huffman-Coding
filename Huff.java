@@ -4,7 +4,8 @@ import javax.swing.UIManager;
  * Main/launch program for Huff assignment. A better
  * comment than this is warranted.
  */
-public class Huff {
+public class Huff
+{
 
     /*
      * Create an interface to interact with a
